@@ -69,7 +69,7 @@ const filterRecipes = (recipes: IRecipe[], searchTerm: string): IRecipe[] => {
 .recipe-list-container {
   display: flex;
   justify-content: center;
-  margin: 2rem 0;
+  margin-top: 2rem;
 }
 
 .grid-container {
