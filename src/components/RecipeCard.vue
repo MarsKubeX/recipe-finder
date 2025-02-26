@@ -142,7 +142,6 @@ const toggleFavorite = () => {
 .toast {
   position: fixed;
   bottom: 20px;
-  left: 50%;
   transform: translateX(-50%);
   background: var(--color-background-toast);
   color: white;
