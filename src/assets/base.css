@@ -34,10 +34,19 @@
   --color-background-mute: var(--vt-c-white-mute);
 
   --color-background-contrast: var(--vt-c-first);
+  --color-background-gradient: var(--vt-c-thirth);
   --text-color-contrast: var(--vt-c-fifth);
+
+  --text-color-button-primary: var(--vt-c-black);
+  --background-color-button-primary: var(--vt-c-fifth);
 
   --color-border: var(--vt-c-divider-light-2);
   --color-border-hover: var(--vt-c-divider-light-1);
+  --color-border-focus: var(--vt-c-fourth);
+
+  --color-background-toast: var(--vt-c-black-soft);
+
+  --color-icon: var(--vt-c-fourth);
 
   --color-heading: var(--vt-c-text-light-1);
   --color-text: var(--vt-c-text-light-1);

@@ -32,6 +32,7 @@ const openCloseMenu = () => {
 .navbar-container {
   display: flex;
   flex-direction: row-reverse;
+  justify-content: start;
   align-items: center;
   background-color: var(--color-background);
   color: var(--text-color);
