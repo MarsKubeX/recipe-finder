@@ -7,7 +7,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue(), vueDevTools()],
-  base: 'https://github.com/MarsKubeX/recipe-finder',
+  base: '/recipe-finder/',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
