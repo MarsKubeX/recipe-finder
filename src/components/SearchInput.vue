@@ -26,6 +26,9 @@ const search = useDebounce((): void => {
   display: flex;
   border: 1px solid var(--color-border);
   border-radius: 0.5rem;
+  @media (min-width: 1024px) {
+    max-width: 20rem;
+  }
 }
 
 .input-group:focus-within {

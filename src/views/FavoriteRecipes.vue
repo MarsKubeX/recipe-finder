@@ -40,7 +40,6 @@ const favoritesRecipes = computed(() =>
 
 .grid-container {
   width: 100%;
-  max-width: 80rem;
   display: grid;
   grid-template-columns: 1fr; /* Una sola columna */
   gap: 2rem;
