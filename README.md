@@ -166,4 +166,6 @@ Due to time constraints, some features were considered but not implemented. Thes
 
 - Optimized CSS structure to reduce duplicate code and improve maintainability.
 
+- Performance Optimization: A Lighthouse analysis revealed areas for performance improvement, particularly in image handling. When searching for recipes, implementing pagination with an offset of ten would ensure that only a limited number of recipe card components load at a time. This prevents the application from rendering all images simultaneously, reducing unnecessary load and improving overall efficiency.
+
 - i18n support for multi-language functionality.
