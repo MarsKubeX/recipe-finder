@@ -55,55 +55,115 @@ npm run build
 npm run deploy
 ```
 
+📌 Design
+
+This project follows the color palette defined here: Color Palette.
+
+Below are the wireframes used as design guidelines:
+
+Desktop: Wireframe
+
+Mobile: Wireframe
+
+🌍 Live Demo
+
+You can test the deployed project in a real environment at the following URL:
+
+🔗 Live Demo
+
+🛠 Tools & Libraries Used
+
+I intentionally avoided component libraries to better showcase my coding skills. The technologies and tools used are:
+
+TypeScript: Adds static type checking, helping catch errors early, reducing bugs, and making the code more robust.
+
+Pinia: Applied for state management, ensuring a reactive and centralized state in the browser.
+
+Vue Router: Used to handle navigation between separate views for recipe search and favorite recipes.
+
+ESLint & Prettier: Enforced consistent code style, prevented errors, and improved maintainability.
+
+GitHub Pages (gh-pages): Used for project deployment.
+
+Vitest: Implemented unit testing.
+
+Vite: Chosen as the build tool for faster development and optimized production builds.
+
+♿ Accessibility
+
+This project follows WCAG guidelines to ensure accessibility compliance. The complete accessibility report is available in the project’s docs folder.
+
+🚀 Future Improvements & Nice-to-Have Features
+
+Due to time constraints, some features were considered but not implemented. These include:
+
+Better error handling throughout the application.
+
+Complete unit testing for all components.
+
+Husky integration to enforce linting and formatting on pre-commits and automate deployments post-push.
+
+Enhanced UI/UX by adding animations and smooth transitions.
+
+Improved accessibility refinements beyond WCAG compliance.
+
+Optimized CSS structure to reduce duplicate code and improve maintainability.
+
+i18n support for multi-language functionality.
+
+This README provides an overview of the project, its design choices, and potential future enhancements. 🚀
+
 ## Design
 
-This page is following this color pallete [color pallete](https://huemint.com/website-3/#palette=fffdf8-fbd0ae-11006d-bfa1a3-549796-efd417)
+This project follows the color palette defined here: [color pallete](https://huemint.com/website-3/#palette=fffdf8-fbd0ae-11006d-bfa1a3-549796-efd417)
 
-These are the sketches for the project. They are just ideas to guide the development.
+Below are the wireframes used as design guidelines:
 
-- Desktop: https://wireframe.cc/UvymaX
-- Mobile: https://wireframe.cc/u0Gt6x
+- [Desktop](https://wireframe.cc/UvymaX)
+- [Mobile](https://wireframe.cc/u0Gt6x)
 
-## Url
+## Live demo
 
-This is the URL of the deployed project in order to test it in a real environment:
+You can test the deployed project in a real environment at the following URL:
 
-- https://marskubex.github.io/recipe-finder/#/
+- [Live demo](https://marskubex.github.io/recipe-finder/#/)
 
 ## Tools and libraries used
 
-I have used a few libraries, but I didn't want to use any components library so I think it will better reflect my coding skills.
+I intentionally avoided component libraries to better showcase my coding skills. The technologies and tools used are:
 
-- Typescript: I used typescript to add a static type checking, which helps to catch errors, reduce bugs and make the code more robust.
+- TypeScript: Adds static type checking, helping catch errors early, reducing bugs, and making the code more robust.
 
-- Pinia: in order to maintain and manage the state in the browser I decide to apply a reactive state management with Pinia.
+- Pinia: Applied for state management, ensuring a reactive and centralized state in the browser.
 
-- Vue-router: as I decide to have a separate views for the recipe search and the favorites recipes I decide to use vue-router in order to handle routing.
+- Vue Router: Used to handle navigation between separate views for recipe search and favorite recipes.
 
-- Eslint and prettier: in order to lint, format the code and prevent bugs and wrong practices.
+- ESLint & Prettier: Enforced consistent code style, prevented errors, and improved maintainability.
 
-- gh-pages: to deploy the project in github.
+- GitHub Pages (gh-pages): Used for project deployment.
 
-- vitest: for unit testing.
+- Vitest: Implemented unit testing.
 
-- vite: as a build tool.
+- Vite: Chosen as the build tool for faster development and optimized production builds.
 
 ## Accesibility
 
-- This project has been checked with the WCAG guides to assure accesibility.
+- This project follows WCAG guidelines to ensure accessibility compliance. The complete accessibility report is available in the project’s docs folder.
 
 ## Future work and nice to have.
 
-These are some ideas and developments that I considered but didn't developed because of time.
+Due to time constraints, some features were considered but not implemented. These include:
 
-- Have better error controlling.
+- Better error handling throughout the application.
 
-- Have every component unit tested.
+- Complete unit testing for all components.
 
-- Add Husky for linting and formatting in precommit and deploying post-push.
+- Husky integration to enforce linting and formatting on pre-commits and automate deployments post-push.
 
-- Add more details to design, like animations and transitions.
+- Enhanced UI/UX by adding animations and smooth transitions.
 
-- Work a bit more in the accesibility.
+- Improved accessibility refinements beyond WCAG compliance.
 
-- i18n: For multiple languages.
+- Optimized CSS structure to reduce duplicate code and improve maintainability.
+
+- i18n support for multi-language functionality.
