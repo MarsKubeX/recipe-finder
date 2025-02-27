@@ -48,6 +48,13 @@ npm run test:unit
 npm run lint
 ```
 
+### Deploy in gh-pages
+
+```sh
+npm run build
+npm run deploy
+```
+
 ## Design
 
 This page is following this color pallete [color pallete](https://huemint.com/website-3/#palette=fffdf8-fbd0ae-11006d-bfa1a3-549796-efd417)
