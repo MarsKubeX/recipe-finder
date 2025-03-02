@@ -3,18 +3,28 @@
     <SearchInput @filterRecipes="findRecipes" />
   </div>
   <div class="recipe-list-container" v-if="!isLoading">
-    <div v-if="displayedRecipes.length" class="grid-container">
-      <RecipeCard
-        v-for="recipe in displayedRecipes"
-        :id="recipe.id"
-        :key="recipe.title"
-        :title="recipe.title"
-        :imageUrl="recipe.imageUrl"
-        :shortDescription="recipe.shortDescription"
-        :steps="recipe.steps"
-        :ingredients="recipe.ingredients"
-        :preparationTime="recipe.preparationTime"
-      ></RecipeCard>
+    <div class="width-100" v-if="displayedRecipes.length">
+      <div class="grid-container">
+        <RecipeCard
+          v-for="recipe in displayedRecipes"
+          :id="recipe.id"
+          :key="recipe.title"
+          :title="recipe.title"
+          :imageUrl="recipe.imageUrl"
+          :shortDescription="recipe.shortDescription"
+          :steps="recipe.steps"
+          :ingredients="recipe.ingredients"
+          :preparationTime="recipe.preparationTime"
+        ></RecipeCard>
+      </div>
+      <div class="recipe-list-pagination">
+        <button @click="goPreviousPage" :disabled="page === 1" class="icon">
+          <i class="material-icons">arrow_back_ios</i></button
+        ><span>{{ `Page ${page} of ${numberOfPages}` }}</span
+        ><button @click="goNextPage" :disabled="page === numberOfPages" class="icon">
+          <i class="material-icons">arrow_forward_ios</i>
+        </button>
+      </div>
     </div>
     <div v-else>No recipes found</div>
   </div>
@@ -27,45 +37,72 @@ import SearchInput from '@/components/SearchInput.vue'
 import RecipeCard from '@/components/RecipeCard.vue'
 import { recipes } from '@/views/recipes.mock.ts'
 import type { IRecipe } from '@/models/recipe.models'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
-const displayedRecipes = ref<IRecipe[]>([...recipes])
+const RECIPES_PER_PAGE = 4
+
+const totalRecipes = ref([...recipes])
+const displayedRecipes = computed(() => [
+  ...totalRecipes.value.slice((page.value - 1) * RECIPES_PER_PAGE, RECIPES_PER_PAGE * page.value),
+])
 const isLoading = ref(false)
+
+// Pagination
+const page = ref(1)
+const numberOfPages = computed(() => Math.ceil(totalRecipes.value.length / RECIPES_PER_PAGE))
+
 const findRecipes = (searchText: string): void => {
   isLoading.value = true
   setTimeout(() => {
-    displayedRecipes.value = [...filterRecipes(recipes, searchText)]
+    totalRecipes.value = [...filterRecipes(recipes, searchText)]
     isLoading.value = false
   }, 500)
 }
 
+const goNextPage = () => {
+  if (page.value !== numberOfPages.value) {
+    page.value++
+  }
+}
+const goPreviousPage = () => {
+  if (page.value !== 1) {
+    page.value--
+  }
+}
+
 const filterRecipes = (recipes: IRecipe[], searchTerm: string): IRecipe[] => {
   if (!searchTerm) {
-    return recipes // Si no hay término de búsqueda, devuelve todas las recetas
+    return recipes // If there is any search text, return all recipes
   }
 
   const lowercasedTerm = searchTerm.toLowerCase()
 
   return recipes.filter((recipe) => {
-    // Comprobar en title y shortDescription
+    // Title and shortDescription
     const matchesTitle = recipe.title.toLowerCase().includes(lowercasedTerm)
     const matchesDescription = recipe.shortDescription.toLowerCase().includes(lowercasedTerm)
 
-    // Comprobar en steps
+    // Steps
     const matchesSteps = recipe.steps.some((step) => step.toLowerCase().includes(lowercasedTerm))
 
-    // Comprobar en ingredients
+    // Ingredients
     const matchesIngredients = recipe.ingredients.some((ingredient) =>
       ingredient.toLowerCase().includes(lowercasedTerm),
     )
 
-    // Devolver true si hay coincidencia en alguno de los campos relevantes
+    // Returns true if there is a match
     return matchesTitle || matchesDescription || matchesSteps || matchesIngredients
   })
 }
 </script>
 
 <style scoped>
+.recipe-list-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  align-items: center;
+}
 .recipe-list-container {
   display: flex;
   justify-content: center;
@@ -75,21 +112,19 @@ const filterRecipes = (recipes: IRecipe[], searchTerm: string): IRecipe[] => {
 .grid-container {
   width: 100%;
   display: grid;
-  grid-template-columns: 1fr; /* Una sola columna */
+  grid-template-columns: 1fr;
   gap: 2rem;
 }
 
-/* Para pantallas medianas (a partir de 768px) */
 @media (min-width: 768px) {
   .grid-container {
-    grid-template-columns: repeat(2, 1fr); /* Dos columnas */
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-/* Para pantallas grandes (a partir de 1024px) */
 @media (min-width: 1024px) {
   .grid-container {
-    grid-template-columns: repeat(3, 1fr); /* Tres columnas */
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 </style>
