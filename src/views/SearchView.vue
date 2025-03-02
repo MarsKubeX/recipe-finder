@@ -17,14 +17,12 @@
           :preparationTime="recipe.preparationTime"
         ></RecipeCard>
       </div>
-      <div class="recipe-list-pagination">
-        <button @click="goPreviousPage" :disabled="page === 1" class="icon">
-          <i class="material-icons">arrow_back_ios</i></button
-        ><span>{{ `Page ${page} of ${numberOfPages}` }}</span
-        ><button @click="goNextPage" :disabled="page === numberOfPages" class="icon">
-          <i class="material-icons">arrow_forward_ios</i>
-        </button>
-      </div>
+      <ListPagination
+        :page="page"
+        :number-of-pages="numberOfPages"
+        :go-next-page="goNextPage"
+        :go-previous-page="goPreviousPage"
+      ></ListPagination>
     </div>
     <div v-else>No recipes found</div>
   </div>
@@ -38,8 +36,10 @@ import RecipeCard from '@/components/RecipeCard.vue'
 import { recipes } from '@/views/recipes.mock.ts'
 import type { IRecipe } from '@/models/recipe.models'
 import { computed, ref } from 'vue'
+import ListPagination from '@/components/ListPagination.vue'
 
 const RECIPES_PER_PAGE = 4
+const FIRST_PAGE = 1
 
 const totalRecipes = ref([...recipes])
 const displayedRecipes = computed(() => [
@@ -48,7 +48,7 @@ const displayedRecipes = computed(() => [
 const isLoading = ref(false)
 
 // Pagination
-const page = ref(1)
+const page = ref(FIRST_PAGE)
 const numberOfPages = computed(() => Math.ceil(totalRecipes.value.length / RECIPES_PER_PAGE))
 
 const findRecipes = (searchText: string): void => {
@@ -74,7 +74,6 @@ const filterRecipes = (recipes: IRecipe[], searchTerm: string): IRecipe[] => {
   if (!searchTerm) {
     return recipes // If there is any search text, return all recipes
   }
-
   const lowercasedTerm = searchTerm.toLowerCase()
 
   return recipes.filter((recipe) => {
@@ -97,12 +96,6 @@ const filterRecipes = (recipes: IRecipe[], searchTerm: string): IRecipe[] => {
 </script>
 
 <style scoped>
-.recipe-list-pagination {
-  display: flex;
-  justify-content: center;
-  padding: 1rem;
-  align-items: center;
-}
 .recipe-list-container {
   display: flex;
   justify-content: center;
