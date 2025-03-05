@@ -46,7 +46,10 @@ const page = ref(FIRST_PAGE)
 const numberOfPages = computed(() => Math.ceil(favoritesRecipes.value.length / RECIPES_PER_PAGE))
 
 const displayedRecipes = computed(() => [
-  ...recipes.slice((page.value - 1) * RECIPES_PER_PAGE, RECIPES_PER_PAGE * page.value),
+  ...favoritesRecipes.value.slice(
+    (page.value - 1) * RECIPES_PER_PAGE,
+    RECIPES_PER_PAGE * page.value,
+  ),
 ])
 
 const goNextPage = () => {
