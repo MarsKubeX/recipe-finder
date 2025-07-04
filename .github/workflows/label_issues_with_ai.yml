@@ -1,0 +1,128 @@
+name: AI Labeler for Issues (Gemini) # Workflow name, updated to indicate Gemini
+
+on:
+  issues:
+    types: [opened, reopened, edited] # Triggers when an issue is opened, reopened, or edited
+
+jobs:
+  label_issue:
+    runs-on: ubuntu-latest # The runner where the action will execute
+    permissions:
+      issues: write # Needs permissions to write (add labels) to issues
+      contents: read # Needs permissions to read the issue content
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4 # Required for the action to access the repository
+
+      - name: Set up Python # Sets up the Python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x' # Uses a recent Python version
+
+      - name: Install dependencies # Installs necessary Python libraries
+        run: pip install requests PyGithub # 'requests' for API calls, 'PyGithub' for GitHub interaction
+
+      - name: Auto Label Issue with Gemini AI # Main step to label the issue with Gemini
+        id: labeler # ID for this step
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }} # Issue title
+          ISSUE_BODY: ${{ github.event.issue.body }} # Issue body
+          AISTUDIO_API_KEY: ${{ secrets.AISTUDIO_API_KEY }} # Your Gemini API Key, stored as a secret
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GitHub Token automatically provided by Actions
+          # Define the labels Gemini can use here. Separate them by commas.
+          # If a predicted label is not in this list, it will not be applied.
+          LABELS: "Bug,UI,Performance,Refactor,Feature,Documentation,Enhancement,Question,Discussion"
+        run: |
+          # The entire Python script below must be indented by exactly two spaces relative to the 'run: |' line.
+          import os
+          import json
+          import requests
+          from github import Github
+
+          # Get environment variables
+          issue_title = os.environ.get('ISSUE_TITLE')
+          issue_body = os.environ.get('ISSUE_BODY')
+          gemini_api_key = os.environ.get('AISTUDIO_API_KEY') # Updated variable name
+          github_token = os.environ.get('GITHUB_TOKEN')
+          labels_str = os.environ.get('LABELS')
+          labels_list = [label.strip() for label in labels_str.split(',')]
+
+          # Initialize GitHub API
+          # GITHUB_REPOSITORY is in 'owner/repo_name' format
+          g = Github(github_token)
+          repo = g.get_repo(os.environ.get('GITHUB_REPOSITORY'))
+          issue_number = ${{ github.event.issue.number }}
+          issue = repo.get_issue(number=issue_number)
+
+          print(f'Processing Issue #{issue_number}: {issue_title}')
+          print(f'Issue Body (first 200 chars): {issue_body[:200]}...')
+          print(f'Available labels for classification: {labels_list}')
+
+          # Prepare the prompt for Gemini
+          # The prompt instructs Gemini to classify the issue and respond only with the label.
+          # responseSchema is used to ensure the response is a JSON with the label.
+          prompt = f'''
+          You are an expert GitHub issue classifier. Your task is to analyze the following GitHub issue and suggest the most appropriate label from the provided list.
+          Respond with ONLY a JSON object containing the chosen label under the key 'label'. Do not include any other text, explanations, or punctuation. If no label is suitable, respond with {{\"label\": \"none\"}}.
+
+          Available labels: {', '.join(labels_list)}
+
+          Issue Title: {issue_title}
+          Issue Description: {issue_body}
+          '''
+
+          # Gemini API URL
+          api_url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_api_key}'
+          headers = {'Content-Type': 'application/json'}
+          payload = {
+              'contents': [{'parts': [{'text': prompt}]}],
+              'generationConfig': {
+                  'temperature': 0.1, # A low temperature (0.1) is ideal for deterministic classification.
+                  'responseMimeType': 'application/json', # Specifies that we expect a JSON response
+                  'responseSchema': { # Defines the schema of the expected JSON
+                      'type': 'OBJECT',
+                      'properties': {
+                          'label': {'type': 'STRING'} # We expect a 'label' property of type STRING
+                      }
+                  }
+              }
+          }
+
+          print('Calling Gemini API...')
+          try:
+              response = requests.post(api_url, headers=headers, data=json.dumps(payload))
+              response.raise_for_status() # Raises an HTTPError for bad responses (4xx or 5xx)
+              result = response.json()
+              print(f'Gemini API response: {json.dumps(result, indent=2)}')
+
+              predicted_label = None
+              # Parse Gemini's response to extract the label
+              if result and result.get('candidates') and len(result['candidates']) > 0 and \
+                 result['candidates'][0].get('content') and result['candidates'][0]['content'].get('parts') and \
+                 len(result['candidates'][0]['content']['parts']) > 0:
+                  try:
+                      # Due to responseSchema, the content should be a JSON string
+                      parsed_content = json.loads(result['candidates'][0]['content']['parts'][0]['text'])
+                      predicted_label = parsed_content.get('label', '').strip()
+                  except json.JSONDecodeError:
+                      print('Error decoding JSON from Gemini response. Raw text:', result['candidates'][0]['content']['parts'][0]['text'])
+                      # Fallback if JSON parsing fails, try to get the text directly (less reliable)
+                      predicted_label = result['candidates'][0]['content']['parts'][0]['text'].strip()
+              
+              # Check if the predicted label is valid and apply it
+              if predicted_label and predicted_label.lower() != 'none' and predicted_label in labels_list:
+                  print(f'Predicted label: {predicted_label}')
+                  try:
+                      issue.add_to_labels(predicted_label)
+                      print(f'Label successfully added: {predicted_label} to issue #{issue_number}')
+                  except Exception as e:
+                      print(f'Error adding label {predicted_label}: {e}')
+                      # If the label does not exist in the repository, try to create it
+                      if "Resource not accessible by integration" in str(e) or "Not Found" in str(e):
+                          print(f"Label '{predicted_label}' might not exist. Attempting to create it...")
+                          try:
+                              repo.create_label(predicted_label, "FFFFFF") # Creates the label with a default color (white)
+                              issue.add_to_labels(predicted_label)
+                              print(f'Label successfully created and added: {predicted_label} to issue #{issue_number}')
+                          except Exception as create_e:
+                              print(f"Could not create label '{predicted_label}': {create_e
