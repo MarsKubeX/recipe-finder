@@ -33,7 +33,9 @@ jobs:
           # If a predicted label is not in this list, it will not be applied.
           LABELS: "Bug,UI,Performance,Refactor,Feature,Documentation,Enhancement,Question,Discussion"
         run: |
-          # The entire Python script below must be indented by exactly two spaces relative to the 'run: |' line.
+          # The Python script is now embedded using '<<EOF' and 'EOF' markers.
+          # The closing 'EOF' MUST NOT BE INDENTED.
+          python <<EOF
           import os
           import json
           import requests
@@ -125,4 +127,17 @@ jobs:
                               issue.add_to_labels(predicted_label)
                               print(f'Label successfully created and added: {predicted_label} to issue #{issue_number}')
                           except Exception as create_e:
-                              print(f"Could not create label '{predicted_label}': {create_e
+                              print(f"Could not create label '{predicted_label}': {create_e}")
+                          else:
+                              raise e # Re-raise the error if it's another type of issue
+              elif predicted_label:
+                  print(f'Predicted label "{predicted_label}" is not in the allowed list or is "none". No label was added.')
+              else:
+                  print('No valid label was predicted by Gemini.')
+
+          except requests.exceptions.HTTPError as err:
+              print(f'An HTTP error occurred: {err}')
+              print(f'Response content: {response.text}')
+          except Exception as e:
+              print(f'An unexpected error occurred: {e}')
+          EOF
