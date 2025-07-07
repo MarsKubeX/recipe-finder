@@ -31,7 +31,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GitHub Token automatically provided by Actions
           # Define the labels Gemini can use here. Separate them by commas.
           # If a predicted label is not in this list, it will not be applied.
-          LABELS: "Bug,UI,Performance,Refactor,Feature,Documentation,Enhancement,Question,Discussion"
+          LABELS: "area/ci,area/tests,dependencies,documentation,github_actions,help wanted,invalid,javascript,kind/bug 🐞,kind/enhancement ✨,kind/epic⚡,kind/feature 💡,qe/test-case"
         run: |
           # The Python script is now embedded using '<<EOF' and 'EOF' markers.
           # The closing 'EOF' MUST NOT BE INDENTED.
