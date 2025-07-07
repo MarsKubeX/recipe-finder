@@ -30,7 +30,7 @@ jobs:
           AISTUDIO_API_KEY: ${{ secrets.AISTUDIO_API_KEY }} # Your Gemini API Key, stored as a secret
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GitHub Token automatically provided by Actions
           # Define the labels Gemini can use here. Separate them by commas.
-          # If a predicted label is not in this list, it will not be applied.
+          # These are the actual label names that will be applied to GitHub issues.
           LABELS: "area/ci,area/tests,dependencies,documentation,github_actions,help wanted,invalid,javascript,kind/bug 🐞,kind/enhancement ✨,kind/epic⚡,kind/feature 💡,qe/test-case"
         run: |
           # The Python script is now embedded using '<<EOF' and 'EOF' markers.
@@ -47,7 +47,31 @@ jobs:
           gemini_api_key = os.environ.get('AISTUDIO_API_KEY') # Updated variable name
           github_token = os.environ.get('GITHUB_TOKEN')
           labels_str = os.environ.get('LABELS')
+          # labels_list contains only the actual label names for validation and application
           labels_list = [label.strip() for label in labels_str.split(',')]
+
+          # Define labels with their descriptions for Gemini's context.
+          # This dictionary is used ONLY to build the prompt for Gemini.
+          labels_with_descriptions = {
+              "area/ci": "Related to continuous integration.",
+              "area/tests": "Related to automated or manual tests.",
+              "dependencies": "Pull requests that update a dependency file.",
+              "documentation": "Improvements or additions to documentation.",
+              "github_actions": "Pull requests that update GitHub Actions code.",
+              "help wanted": "Extra attention is needed.",
+              "invalid": "This doesn't seem right or is invalid.",
+              "javascript": "Pull requests that update Javascript code.",
+              "kind/bug 🐞": "Something isn't working or is a bug.",
+              "kind/enhancement ✨": "Issue for requesting an improvement to existing functionality.",
+              "kind/epic⚡": "Issue describing an epic (a large set of functionalities).",
+              "kind/feature 💡": "Issue for requesting a new feature.",
+              "qe/test-case": "Related to Quality Assurance test cases."
+          }
+
+          # Format labels and their descriptions for the Gemini prompt
+          formatted_labels_for_prompt = []
+          for label, desc in labels_with_descriptions.items():
+              formatted_labels_for_prompt.append(f"- {label} ({desc})")
 
           # Initialize GitHub API
           # GITHUB_REPOSITORY is in 'owner/repo_name' format
@@ -67,7 +91,8 @@ jobs:
           You are an expert GitHub issue classifier. Your task is to analyze the following GitHub issue and suggest the most appropriate label from the provided list.
           Respond with ONLY a JSON object containing the chosen label under the key 'label'. Do not include any other text, explanations, or punctuation. If no label is suitable, respond with {{\"label\": \"none\"}}.
 
-          Available labels: {', '.join(labels_list)}
+          Available labels (with descriptions for context):
+          {'\n'.join(formatted_labels_for_prompt)}
 
           Issue Title: {issue_title}
           Issue Description: {issue_body}
