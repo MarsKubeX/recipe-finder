@@ -31,7 +31,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GitHub Token automatically provided by Actions
           # Define the labels Gemini can use here. Separate them by commas.
           # These are the actual label names that will be applied to GitHub issues.
-          LABELS: "area/ci,area/tests,dependencies,documentation,github_actions,help wanted,invalid,javascript,kind/bug 🐞,kind/enhancement ✨,kind/epic⚡,kind/feature 💡,qe/test-case"
+          # IMPORTANT: Keep this list updated manually if your repository labels change.
+          LABELS: "area/authentication 🔑,area/blog 📝,area/catalog,area/ci,area/cncf,area/community 🫶,area/dashboard 📊,area/demo 🕺,area/dependencies,area/development-mode 🧑‍💻,area/docker-compatibility 🐳,area/docker-desktop-extension 🐳🧩,area/documentation 📖,area/electron,area/extension/crc,area/extension/docker 🐳,area/extension/kind 🍾,area/extension/kube-context ☸,area/extension/kubectl-cli,area/extension/lima 🟢,area/extension/podman 🦭,area/extensions 🧩,area/extensions/compose 🎹,area/flatpak 📦,area/i18n,area/install 🎁,area/kubernetes ☸️,area/linter,area/model,area/onboarding,area/podify,area/podman-upstream 🦭,area/proxy,area/recommendations,area/registries,area/release,area/renderer 📈,area/settings ⚙️,area/statusbar 🚥,area/storybook,area/system-tray 📤,area/task-manager,area/telemetry 📈,area/terminal,area/tests 🚦,area/tooling 🛠️,area/ui 📈,area/ui-components,area/update,area/vpn,area/website 🌐,area/webview,dependencies,engine/podman 🦭,github_actions,Graphic Design,hacktoberfest,hacktoberfest-accepted,help wanted,javascript,kind/bug 🐞,kind/design-spec 📐,kind/enhancement ✨,kind/epic⚡,kind/feature 💡,kind/release 🎉,kind/task ☑️,kind/technical-debt 🔧,lifecycle/frozen,lifecycle/stale,os/linux 🐧,os/macOS 🍎,os/windows 🪟,qe/regression,qe/review,qe/test-case,qe/testing-required,status/need-triage,theme/compose,theme/container-management,theme/enterprise 🏢,theme/extensibility 🌉,theme/foundation 🧱,theme/install,theme/kubernetes,UX/UI Issue,👨‍👩‍👦 os/all"
         run: |
           # The Python script is now embedded using '<<EOF' and 'EOF' markers.
           # The closing 'EOF' MUST NOT BE INDENTED.
@@ -44,37 +45,13 @@ jobs:
           # Get environment variables
           issue_title = os.environ.get('ISSUE_TITLE')
           issue_body = os.environ.get('ISSUE_BODY')
-          gemini_api_key = os.environ.get('AISTUDIO_API_KEY') # Updated variable name
+          gemini_api_key = os.environ.get('AISTUDIO_API_KEY')
           github_token = os.environ.get('GITHUB_TOKEN')
           labels_str = os.environ.get('LABELS')
           # labels_list contains only the actual label names for validation and application
           labels_list = [label.strip() for label in labels_str.split(',')]
 
-          # Define labels with their descriptions for Gemini's context.
-          # This dictionary is used ONLY to build the prompt for Gemini.
-          labels_with_descriptions = {
-              "area/ci": "Related to continuous integration.",
-              "area/tests": "Related to automated or manual tests.",
-              "dependencies": "Pull requests that update a dependency file.",
-              "documentation": "Improvements or additions to documentation.",
-              "github_actions": "Pull requests that update GitHub Actions code.",
-              "help wanted": "Extra attention is needed.",
-              "invalid": "This doesn't seem right or is invalid.",
-              "javascript": "Pull requests that update Javascript code.",
-              "kind/bug 🐞": "Something isn't working or is a bug.",
-              "kind/enhancement ✨": "Issue for requesting an improvement to existing functionality.",
-              "kind/epic⚡": "Issue describing an epic (a large set of functionalities).",
-              "kind/feature 💡": "Issue for requesting a new feature.",
-              "qe/test-case": "Related to Quality Assurance test cases."
-          }
-
-          # Format labels and their descriptions for the Gemini prompt
-          formatted_labels_for_prompt = []
-          for label, desc in labels_with_descriptions.items():
-              formatted_labels_for_prompt.append(f"- {label} ({desc})")
-
           # Initialize GitHub API
-          # GITHUB_REPOSITORY is in 'owner/repo_name' format
           g = Github(github_token)
           repo = g.get_repo(os.environ.get('GITHUB_REPOSITORY'))
           issue_number = ${{ github.event.issue.number }}
@@ -91,8 +68,7 @@ jobs:
           You are an expert GitHub issue classifier. Your task is to analyze the following GitHub issue and suggest the most appropriate label from the provided list.
           Respond with ONLY a JSON object containing the chosen label under the key 'label'. Do not include any other text, explanations, or punctuation. If no label is suitable, respond with {{\"label\": \"none\"}}.
 
-          Available labels (with descriptions for context):
-          {'\n'.join(formatted_labels_for_prompt)}
+          Available labels: {', '.join(labels_list)}
 
           Issue Title: {issue_title}
           Issue Description: {issue_body}
@@ -116,6 +92,8 @@ jobs:
           }
 
           print('Calling Gemini API...')
+          labels_to_add = [] # List to store labels to be added to the issue
+
           try:
               response = requests.post(api_url, headers=headers, data=json.dumps(payload))
               response.raise_for_status() # Raises an HTTPError for bad responses (4xx or 5xx)
@@ -136,29 +114,40 @@ jobs:
                       # Fallback if JSON parsing fails, try to get the text directly (less reliable)
                       predicted_label = result['candidates'][0]['content']['parts'][0]['text'].strip()
               
-              # Check if the predicted label is valid and apply it
+              # Logic for 'status/need-triage' and other labels
               if predicted_label and predicted_label.lower() != 'none' and predicted_label in labels_list:
+                  labels_to_add.append(predicted_label)
                   print(f'Predicted label: {predicted_label}')
-                  try:
-                      issue.add_to_labels(predicted_label)
-                      print(f'Label successfully added: {predicted_label} to issue #{issue_number}')
-                  except Exception as e:
-                      print(f'Error adding label {predicted_label}: {e}')
-                      # If the label does not exist in the repository, try to create it
-                      if "Resource not accessible by integration" in str(e) or "Not Found" in str(e):
-                          print(f"Label '{predicted_label}' might not exist. Attempting to create it...")
-                          try:
-                              repo.create_label(predicted_label, "FFFFFF") # Creates the label with a default color (white)
-                              issue.add_to_labels(predicted_label)
-                              print(f'Label successfully created and added: {predicted_label} to issue #{issue_number}')
-                          except Exception as create_e:
-                              print(f"Could not create label '{predicted_label}': {create_e}")
-                          else:
-                              raise e # Re-raise the error if it's another type of issue
-              elif predicted_label:
-                  print(f'Predicted label "{predicted_label}" is not in the allowed list or is "none". No label was added.')
               else:
-                  print('No valid label was predicted by Gemini.')
+                  print(f'Predicted label "{predicted_label}" is not in the allowed list or is "none".')
+                  # If Gemini is uncertain or predicted an invalid label, add 'status/need-triage'
+                  if "status/need-triage" in labels_list: # Check if the triage label exists in the provided list
+                      labels_to_add.append("status/need-triage")
+                      print("Adding 'status/need-triage' due to AI uncertainty or invalid prediction.")
+                  else:
+                      print("Warning: 'status/need-triage' label not found in the provided LABELS list. Cannot add.")
+
+              # Apply all collected labels
+              if labels_to_add:
+                  for label_name in labels_to_add:
+                      try:
+                          issue.add_to_labels(label_name)
+                          print(f'Label successfully added: {label_name} to issue #{issue_number}')
+                      except Exception as e:
+                          print(f'Error adding label {label_name}: {e}')
+                          # If the label does not exist in the repository, try to create it
+                          if "Resource not accessible by integration" in str(e) or "Not Found" in str(e):
+                              print(f"Label '{label_name}' might not exist. Attempting to create it...")
+                              try:
+                                  repo.create_label(label_name, "FFFFFF") # Creates the label with a default color (white)
+                                  issue.add_to_labels(label_name)
+                                  print(f'Label successfully created and added: {label_name} to issue #{issue_number}')
+                              except Exception as create_e:
+                                  print(f"Could not create label '{label_name}': {create_e}")
+                          else:
+                              raise e # Re-raise the error if it's another type of problem
+              else:
+                  print('No labels were determined to be added to the issue.')
 
           except requests.exceptions.HTTPError as err:
               print(f'An HTTP error occurred: {err}')
