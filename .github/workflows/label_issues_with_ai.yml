@@ -62,11 +62,11 @@ jobs:
           print(f'Available labels for classification: {labels_list}')
 
           # Prepare the prompt for Gemini
-          # The prompt instructs Gemini to classify the issue and respond only with the label.
-          # responseSchema is used to ensure the response is a JSON with the label.
+          # The prompt instructs Gemini to classify the issue and respond with an array of labels.
+          # responseSchema is used to ensure the response is a JSON with an array of labels.
           prompt = f'''
-          You are an expert GitHub issue classifier. Your task is to analyze the following GitHub issue and suggest the most appropriate label from the provided list.
-          Respond with ONLY a JSON object containing the chosen label under the key 'label'. Do not include any other text, explanations, or punctuation. If no label is suitable, respond with {{\"label\": \"none\"}}.
+          You are an expert GitHub issue classifier. Your task is to analyze the following GitHub issue and suggest ALL appropriate labels from the provided list.
+          Respond with ONLY a JSON object containing an array of chosen labels under the key 'labels'. Do not include any other text, explanations, or punctuation. If no label is suitable, respond with {{\"labels\": []}}.
 
           Available labels: {', '.join(labels_list)}
 
@@ -85,7 +85,10 @@ jobs:
                   'responseSchema': { # Defines the schema of the expected JSON
                       'type': 'OBJECT',
                       'properties': {
-                          'label': {'type': 'STRING'} # We expect a 'label' property of type STRING
+                          'labels': { # Changed key to 'labels' (plural)
+                              'type': 'ARRAY',
+                              'items': {'type': 'STRING'} # Expecting an array of strings
+                          }
                       }
                   }
               }
@@ -93,6 +96,7 @@ jobs:
 
           print('Calling Gemini API...')
           labels_to_add = [] # List to store labels to be added to the issue
+          triage_needed = False # Flag to determine if 'status/need-triage' should be added
 
           try:
               response = requests.post(api_url, headers=headers, data=json.dumps(payload))
@@ -100,35 +104,50 @@ jobs:
               result = response.json()
               print(f'Gemini API response: {json.dumps(result, indent=2)}')
 
-              predicted_label = None
-              # Parse Gemini's response to extract the label
+              predicted_labels_from_gemini = []
+              # Parse Gemini's response to extract the list of labels
               if result and result.get('candidates') and len(result['candidates']) > 0 and \
                  result['candidates'][0].get('content') and result['candidates'][0]['content'].get('parts') and \
                  len(result['candidates'][0]['content']['parts']) > 0:
                   try:
                       # Due to responseSchema, the content should be a JSON string
                       parsed_content = json.loads(result['candidates'][0]['content']['parts'][0]['text'])
-                      predicted_label = parsed_content.get('label', '').strip()
+                      predicted_labels_from_gemini = parsed_content.get('labels', []) # Get the 'labels' array, default to empty list
                   except json.JSONDecodeError:
                       print('Error decoding JSON from Gemini response. Raw text:', result['candidates'][0]['content']['parts'][0]['text'])
-                      # Fallback if JSON parsing fails, try to get the text directly (less reliable)
-                      predicted_label = result['candidates'][0]['content']['parts'][0]['text'].strip()
-              
-              # Logic for 'status/need-triage' and other labels
-              if predicted_label and predicted_label.lower() != 'none' and predicted_label in labels_list:
-                  labels_to_add.append(predicted_label)
-                  print(f'Predicted label: {predicted_label}')
+                      triage_needed = True # If parsing fails, definitely needs triage
               else:
-                  print(f'Predicted label "{predicted_label}" is not in the allowed list or is "none".')
-                  # If Gemini is uncertain or predicted an invalid label, add 'status/need-triage'
-                  if "status/need-triage" in labels_list: # Check if the triage label exists in the provided list
-                      labels_to_add.append("status/need-triage")
-                      print("Adding 'status/need-triage' due to AI uncertainty or invalid prediction.")
-                  else:
-                      print("Warning: 'status/need-triage' label not found in the provided LABELS list. Cannot add.")
+                  triage_needed = True # If no candidates or content, needs triage
+
+              # Process predicted labels
+              if predicted_labels_from_gemini:
+                  found_valid_label = False
+                  for label in predicted_labels_from_gemini:
+                      label_stripped = label.strip()
+                      if label_stripped and label_stripped.lower() != 'none' and label_stripped in labels_list:
+                          labels_to_add.append(label_stripped)
+                          print(f'Predicted and valid label: {label_stripped}')
+                          found_valid_label = True
+                      else:
+                          print(f'Predicted label "{label_stripped}" is not in the allowed list or is "none".')
+                  
+                  if not found_valid_label:
+                      triage_needed = True # If no valid labels were found among predictions
+              else:
+                  triage_needed = True # If Gemini returned an empty list
+
+              # Add 'status/need-triage' if flagged
+              if triage_needed and "status/need-triage" in labels_list:
+                  labels_to_add.append("status/need-triage")
+                  print("Adding 'status/need-triage' due to AI uncertainty or no valid prediction.")
+              elif triage_needed:
+                  print("Warning: 'status/need-triage' label not found in the provided LABELS list. Cannot add.")
+
 
               # Apply all collected labels
               if labels_to_add:
+                  # Remove duplicates in case 'status/need-triage' was added multiple times or other duplicates
+                  labels_to_add = list(set(labels_to_add))
                   for label_name in labels_to_add:
                       try:
                           issue.add_to_labels(label_name)
