@@ -1,0 +1,177 @@
+name: AI Story Point Estimator (Gemini)
+
+on:
+  issues:
+    types: [opened, reopened, edited]
+
+jobs:
+  estimate_story_points:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install requests PyGithub
+
+      - name: Estimate Story Points with Gemini AI
+        id: estimator
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STORY_POINTS: "1, 2, 3, 5, 10, 20"
+          PROJECT_ARCHITECTURE_SUMMARY: |
+            ### Podman Desktop Architecture Summary
+
+            #### Core Architecture
+            - Podman Desktop is built on **Electron**. It follows the standard Electron architecture with three main processes: **Main**, **Renderer**, and **Preload**.
+            - The **Main Process** is the application's entry point and is responsible for application initialization, window management, plugin system setup, and security restrictions.
+            - The **Renderer Process** handles the UI layer and is built with **Svelte** components.
+            - **Preload Scripts** provide a secure bridge between the main and renderer processes through the context bridge.
+            - The **plugin system** is a core component that enables extensibility through **extensions** and **providers**.
+            - Communication between the main and renderer processes is done securely using **IPC** (Inter-Process Communication) and the **context bridge**.
+
+            #### Key Technologies
+            - **Application Framework**: **Electron** (v35.1.5), which combines Chromium for rendering and Node.js for backend operations.
+            - **UI Framework**: **Svelte** (v5.27.3). The project also uses a dedicated UI component library (@podman-desktop/ui-svelte) and **TailwindCSS** for styling.
+            - **Development Tools**: The application is primarily written in **TypeScript** (v5.8.3) and uses **Vite** (v6.3.1) as its build tool. Other tools include **Vitest** for unit testing and **Playwright** for end-to-end (E2E) testing.
+            - **Cross-Platform Support**: The application is designed to run on **Windows**, **macOS**, and **Linux**.
+
+            #### Extension System
+            - The extension system allows Podman Desktop to be extended with new functionality through plugins that integrate with container engines and other tools.
+            - **Key Components**: An **Extension Loader** for discovering and activating extensions, an **Extension API** for interaction, a **Plugin System** for managing the extension lifecycle, and a **Provider Registry** for tracking container and Kubernetes providers.
+
+            #### Development Workflow & Distribution
+            - **Development Workflow**: The codebase is organized into a monorepo. Dependencies are installed using **pnpm**. To run the application in development mode with hot reloading, the `pnpm watch` command is used.
+            - **CI/CD Pipeline**: **GitHub Actions** automates the build, test, and release processes.
+            - **Distribution**: Podman Desktop is distributed in various formats, including NSIS and portable executables for Windows, a Disk image for macOS, and Flatpak for Linux. The build process creates platform-specific packages that are distributed through GitHub releases and other channels.
+
+        run: |
+          python <<EOF
+          import os
+          import json
+          import requests
+          from github import Github
+
+          # Get environment variables
+          issue_title = os.environ.get('ISSUE_TITLE')
+          issue_body = os.environ.get('ISSUE_BODY')
+          gemini_api_key = os.environ.get('GEMINI_API_KEY')
+          github_token = os.environ.get('GITHUB_TOKEN')
+          story_points_str = os.environ.get('STORY_POINTS')
+          project_architecture = os.environ.get('PROJECT_ARCHITECTURE_SUMMARY')
+
+          # Initialize GitHub API
+          g = Github(github_token)
+          repo = g.get_repo(os.environ.get('GITHUB_REPOSITORY'))
+          issue_number = ${{ github.event.issue.number }}
+          issue = repo.get_issue(number=issue_number)
+
+          # Prepare the prompt for Gemini
+          prompt = f'''
+          You are an expert software developer with extensive experience in agile methodologies. Your task is to analyze a new GitHub issue and estimate its effort in Story Points.
+
+          Your estimation must be one of the following values: {story_points_str}.
+
+          ---
+          # Project Architecture Context
+          This is the technical architecture of our project. Your estimation should consider the complexity of working within this environment.
+
+          {project_architecture}
+          
+          ---
+          # Story Point Examples (Few-shot Prompting)
+
+          Here are examples of issues with their corresponding Story Point estimation. Use these as a guide to understand the complexity associated with each value.
+
+          ## 1 Story Point
+          A minor text change or simple typo fix. Requires a single-line change and minimal risk.
+          Issue Title: Rename "Search Disk Images" to "Search disk images"
+          Issue Description: Change the UI text to match the new casing standard.
+
+          ## 3 Story Points
+          A simple feature or a fix requiring a well-defined change across a few files. Low risk.
+          Issue Title: Add repository URL in package.json and use it in ts files
+          Issue Description: Add a repository URL in the main package.json and consume it in TypeScript files for a specific feature.
+
+          ## 5 Story Points
+          A small feature or a bug requiring a more complex fix or refactor. It involves changes across multiple files or a non-trivial framework update.
+          Issue Title: Update UI component InstallManuallyExtensionModal to Svelte 5
+          Issue Description: The project's dependencies have been updated to Svelte 5. This issue requires adapting the existing InstallManuallyExtensionModal component to be fully compatible with the new framework version.
+
+          ## 10 Story Points
+          A major architectural refactor or a significant feature. It involves changes to core systems, high risk, and requires extensive testing across different platforms.
+          Issue Title: switch from applehv to libkrun as default
+          Issue Description: For Windows startup, we are using a .vbs script that opens with notepad. It should be replaced with a standard solution like a link to the executable. This is a fundamental change to the installation process.
+          
+          ---
+          # New Issue to Estimate
+
+          Please, estimate the following issue based on the context and examples above.
+          
+          Issue Title: {issue_title}
+          Issue Description: {issue_body}
+          
+          Respond with ONLY a JSON object containing a single key 'story_points' with the estimated integer value. Do not include any other text or explanations. For example: {{"story_points": 5}}.
+          '''
+
+          # Gemini API URL
+          api_url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_api_key}'
+          headers = {'Content-Type': 'application/json'}
+          payload = {
+              'contents': [{'parts': [{'text': prompt}]}],
+              'generationConfig': {
+                  'temperature': 0.1,
+                  'responseMimeType': 'application/json'
+              },
+              'safetySettings': [
+                  {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                  {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                  {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                  {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"}
+              ]
+          }
+
+          print('Calling Gemini API...')
+          try:
+              response = requests.post(api_url, headers=headers, data=json.dumps(payload))
+              response.raise_for_status()
+              result = response.json()
+              print(f'Gemini API response: {json.dumps(result, indent=2)}')
+
+              # Parse Gemini's response
+              predicted_sp = None
+              try:
+                  content_part = result['candidates'][0]['content']['parts'][0]['text']
+                  parsed_content = json.loads(content_part)
+                  predicted_sp = parsed_content.get('story_points')
+              except (KeyError, IndexError, json.JSONDecodeError) as e:
+                  print(f'Error parsing Gemini response: {e}')
+
+              # Add a comment to the issue with the estimation
+              if predicted_sp is not None:
+                  comment_body = f"🤖 **AI Story Point Suggestion:**\n\nBased on my analysis and your team's examples, I suggest an estimated effort of **{predicted_sp} Story Points** for this issue."
+                  issue.create_comment(comment_body)
+                  print(f'Successfully commented on issue #{issue_number} with {predicted_sp} Story Points.')
+              else:
+                  comment_body = "🤖 **AI Story Point Suggestion:**\n\nI was unable to provide a valid story point estimation for this issue. This might be due to a lack of clear description or an error in the AI service. Please, assign story points manually."
+                  issue.create_comment(comment_body)
+                  print('Could not get a valid estimation from the AI.')
+
+          except requests.exceptions.HTTPError as err:
+              print(f'An HTTP error occurred: {err}')
+              print(f'Response content: {response.text}')
+          except Exception as e:
+              print(f'An unexpected error occurred: {e}')
+EOF
