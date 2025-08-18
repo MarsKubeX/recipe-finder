@@ -123,7 +123,7 @@ jobs:
           Issue Title: {issue_title}
           Issue Description: {issue_body}
           
-          Respond with ONLY a JSON object containing a single key 'story_points' with the estimated integer value. Do not include any other text or explanations. For example: {{"story_points": 5}}.
+          Respond with ONLY a JSON object containing two keys: 'story_points' with the estimated integer value, and 'analysis' with a string explaining your reasoning. Do not include any other text or explanations. For example: {{"story_points": 5, "analysis": "This is a refactor..."}}.
           '''
 
           # Gemini API URL
@@ -152,16 +152,18 @@ jobs:
 
               # Parse Gemini's response
               predicted_sp = None
+              analysis_text = "I was unable to provide a valid story point estimation for this issue."
               try:
                   content_part = result['candidates'][0]['content']['parts'][0]['text']
                   parsed_content = json.loads(content_part)
                   predicted_sp = parsed_content.get('story_points')
+                  analysis_text = parsed_content.get('analysis', analysis_text)
               except (KeyError, IndexError, json.JSONDecodeError) as e:
                   print(f'Error parsing Gemini response: {e}')
 
               # Add a comment to the issue with the estimation
               if predicted_sp is not None:
-                  comment_body = f"🤖 **AI Story Point Suggestion:**\n\nBased on my analysis and your team's examples, I suggest an estimated effort of **{predicted_sp} Story Points** for this issue."
+                  comment_body = f"🤖 **AI Story Point Suggestion:**\n\n- **Estimated Effort:** **{predicted_sp} Story Points**\n\n---\n\n### AI Analysis\n\n{analysis_text}"
                   issue.create_comment(comment_body)
                   print(f'Successfully commented on issue #{issue_number} with {predicted_sp} Story Points.')
               else:
