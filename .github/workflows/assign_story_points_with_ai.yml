@@ -180,7 +180,7 @@ jobs:
                   
                   # --- Obtener IDs necesarios (GitHub GraphQL API) ---
                   print("Getting GitHub project and issue IDs...")
-                  query = """query($owner: String!, $repo: String!, $issue_number: Int!, $project_number: Int!) { user(login: $owner) { projectV2(number: $project_number) { id field(name: "Story Points") { ... on ProjectV2Field { id }}}} repository(owner: $owner, name: $repo) { issue(number: $issue_number) { id projectItems(first: 10) { nodes { id project { number}}}}}}"""
+                  query = """query(\$owner: String!, \$repo: String!, \$issue_number: Int!, \$project_number: Int!) { user(login: \$owner) { projectV2(number: \$project_number) { id field(name: "Story Points") { ... on ProjectV2Field { id }}}} repository(owner: \$owner, name: \$repo) { issue(number: \$issue_number) { id projectItems(first: 10) { nodes { id project { number}}}}}}"""
                   print("Query to be sent:\n", query)
                   variables = {
                       "owner": github_user,
