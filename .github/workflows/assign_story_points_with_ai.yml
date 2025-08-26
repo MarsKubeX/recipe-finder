@@ -28,13 +28,13 @@ jobs:
         env:
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
-          GEMINI_API_KEY: ${{ secrets.AISTUDIO_API_KEY }}
+          AISTUDIO_API_KEY: ${{ secrets.AISTUDIO_API_KEY }}  # Usando el nombre de tu secret
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STORY_POINTS: "1, 2, 3, 5, 10, 20"
-          PROJECT_NUMBER: 1  # Reemplaza con el número de tu proyecto
+          PROJECT_NUMBER: 1
           PROJECT_FIELD: "Story Points"
-          GITHUB_USER: "MarsKubeX"  # Reemplaza con tu nombre de usuario o el de la organización
-          GITHUB_REPO: "recipe-finder" # Reemplaza con el nombre de tu repositorio
+          GITHUB_USER: "your_username"
+          GITHUB_REPO: "your_repository"
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           PROJECT_ARCHITECTURE_SUMMARY: |
             ### Podman Desktop Architecture Summary
@@ -68,17 +68,19 @@ jobs:
           import json
           import requests
           from github import Github
+          import sys
 
-          def run_query(query, variables=None):
+          def run_graphql_query(query, variables=None):
+              """Helper function to run a GraphQL query against the GitHub API."""
               headers = {"Authorization": f"Bearer {github_token}"}
               request = requests.post('https://api.github.com/graphql', json={'query': query, 'variables': variables}, headers=headers)
               request.raise_for_status()
               return request.json()
 
-          # Get environment variables
+          # --- Get environment variables ---
           issue_title = os.environ.get('ISSUE_TITLE')
           issue_body = os.environ.get('ISSUE_BODY')
-          gemini_api_key = os.environ.get('GEMINI_API_KEY')
+          gemini_api_key = os.environ.get('AISTUDIO_API_KEY')  # Corregido aquí
           github_token = os.environ.get('GITHUB_TOKEN')
           story_points_str = os.environ.get('STORY_POINTS')
           project_number = int(os.environ.get('PROJECT_NUMBER'))
@@ -88,7 +90,7 @@ jobs:
           issue_number = int(os.environ.get('ISSUE_NUMBER'))
           project_architecture = os.environ.get('PROJECT_ARCHITECTURE_SUMMARY')
 
-          # Prepare the prompt for Gemini
+          # --- Prepare the prompt for Gemini ---
           prompt = f'''
           You are an expert software developer with extensive experience in agile methodologies. Your task is to analyze a new GitHub issue and estimate its effort in Story Points.
 
@@ -136,8 +138,8 @@ jobs:
           Respond with ONLY a JSON object containing two keys: 'story_points' with the estimated integer value, and 'analysis' with a string explaining your reasoning. Do not include any other text or explanations. For example: {{"story_points": 5, "analysis": "This is a refactor..."}}.
           '''
 
-          # Gemini API URL
-          api_url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_api_key}'
+          # --- Calling Gemini API ---
+          gemini_api_url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_api_key}'
           headers = {'Content-Type': 'application/json'}
           payload = {
               'contents': [{'parts': [{'text': prompt}]}],
@@ -155,26 +157,24 @@ jobs:
 
           print('Calling Gemini API...')
           try:
-              response = requests.post(api_url, headers=headers, data=json.dumps(payload))
+              response = requests.post(gemini_api_url, headers=headers, data=json.dumps(payload))
               response.raise_for_status()
-              result = response.json()
-              print(f'Gemini API response: {json.dumps(result, indent=2)}')
+              gemini_result = response.json()
+              print(f'Gemini API response: {json.dumps(gemini_result, indent=2)}')
 
-              # --- Extraer la estimación y el análisis ---
               predicted_sp = None
               analysis_text = "I was unable to provide a valid story point estimation for this issue."
               try:
-                  content_part = result['candidates'][0]['content']['parts'][0]['text']
+                  content_part = gemini_result['candidates'][0]['content']['parts'][0]['text']
                   parsed_content = json.loads(content_part)
                   predicted_sp = parsed_content.get('story_points')
                   analysis_text = parsed_content.get('analysis', analysis_text)
               except (KeyError, IndexError, json.JSONDecodeError) as e:
                   print(f'Error parsing Gemini response: {e}')
 
-              # --- Si la estimación es válida, actualizar el campo de GitHub Project ---
               if predicted_sp is not None:
                   
-                  # 1. Obtener los IDs necesarios (Issue, Project, Field)
+                  # --- Obtener IDs necesarios (GitHub GraphQL API) ---
                   query = """
                   query($owner: String!, $repo: String!, $issue_number: Int!, $project_number: Int!) {
                     repository(owner: $owner, name: $repo) {
@@ -206,17 +206,18 @@ jobs:
                       "issue_number": issue_number,
                       "project_number": project_number
                   }
-                  data = run_query(query, variables)
+                  
+                  # Se usa la función auxiliar 'run_graphql_query' para esta llamada
+                  data = run_graphql_query(query, variables)
                   
                   issue_id = data['data']['repository']['issue']['id']
                   project_id = data['data']['repository']['projectV2']['id']
                   story_points_field_id = data['data']['repository']['projectV2']['field']['id']
 
-                  # Encontrar el Project Item ID para la issue
                   project_item_id = None
                   project_items = data['data']['repository']['issue']['projectItems']['nodes']
                   for item in project_items:
-                      if item['project']['number'] == project_number:
+                      if item and item.get('project') and item['project'].get('number') == project_number:
                           project_item_id = item['id']
                           break
                   
@@ -225,7 +226,7 @@ jobs:
                       issue.create_comment("🤖 **AI Story Point Suggestion:**\n\nI was unable to update the Story Points. This issue is not in the specified project.")
                       sys.exit(1)
 
-                  # 2. Mutación para actualizar el campo "Story Points"
+                  # --- Mutación para actualizar el campo "Story Points" ---
                   mutation = """
                   mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $value: Float!) {
                     updateProjectV2ItemFieldValue(
@@ -248,13 +249,15 @@ jobs:
                       "project_id": project_id,
                       "item_id": project_item_id,
                       "field_id": story_points_field_id,
-                      "value": predicted_sp
+                      "value": float(predicted_sp) # El valor debe ser de tipo Float
                   }
-                  update_data = run_query(mutation, variables)
+                  
+                  # Se usa la función auxiliar 'run_graphql_query' para la mutación
+                  update_data = run_graphql_query(mutation, variables)
                   
                   print(f'Successfully updated Story Points for issue #{issue_number} to {predicted_sp}.')
                   
-                  # 3. Añadir un comentario con el análisis
+                  # --- Añadir un comentario con el análisis ---
                   g = Github(github_token)
                   repo = g.get_repo(os.environ.get('GITHUB_REPOSITORY'))
                   issue = repo.get_issue(number=issue_number)
