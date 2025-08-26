@@ -223,7 +223,7 @@ jobs:
                   if not project_item_id:
                       print("Error: Issue is not associated with the specified project.")
                       issue.create_comment("🤖 **AI Story Point Suggestion:**\n\nI was unable to update the Story Points. This issue is not in the specified project.")
-                      return
+                      sys.exit(1)
 
                   # 2. Mutación para actualizar el campo "Story Points"
                   mutation = """
