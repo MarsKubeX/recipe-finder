@@ -28,7 +28,7 @@ jobs:
         env:
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.AISTUDIO_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STORY_POINTS: "1, 2, 3, 5, 10, 20"
           PROJECT_NUMBER: 1  # Reemplaza con el número de tu proyecto
