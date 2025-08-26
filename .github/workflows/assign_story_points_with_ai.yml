@@ -207,6 +207,7 @@ jobs:
                     }
                   }
                   """
+                  print("Query to be sent:\n", query)
                   variables = {
                       "owner": github_user,
                       "repo": github_repo,
