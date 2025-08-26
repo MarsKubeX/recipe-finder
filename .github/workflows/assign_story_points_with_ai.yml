@@ -178,10 +178,20 @@ jobs:
 
               if predicted_sp is not None:
                   
-                  # --- Obtener IDs de la issue y de la tarjeta de proyecto ---
-                  print("Getting GitHub issue and project item IDs...")
-                  query_issue = """
-                  query($owner: String!, $repo: String!, $issue_number: Int!) {
+                  # --- Obtener IDs necesarios (GitHub GraphQL API) ---
+                  print("Getting GitHub project and issue IDs...")
+                  query = """
+                  query($owner: String!, $repo: String!, $issue_number: Int!, $project_number: Int!) {
+                    user(login: $owner) {
+                      projectV2(number: $project_number) {
+                        id
+                        field(name: "Story Points") {
+                          ... on ProjectV2Field {
+                            id
+                          }
+                        }
+                      }
+                    }
                     repository(owner: $owner, name: $repo) {
                       issue(number: $issue_number) {
                         id
@@ -197,17 +207,21 @@ jobs:
                     }
                   }
                   """
-                  variables_issue = {
+                  variables = {
                       "owner": github_user,
                       "repo": github_repo,
-                      "issue_number": issue_number
+                      "issue_number": issue_number,
+                      "project_number": project_number
                   }
                   
-                  data_issue = run_graphql_query(query_issue, variables_issue)
-                  issue_id = data_issue['data']['repository']['issue']['id']
+                  data = run_graphql_query(query, variables)
+                  
+                  issue_id = data['data']['repository']['issue']['id']
+                  project_id = data['data']['user']['projectV2']['id']
+                  story_points_field_id = data['data']['user']['projectV2']['field']['id']
 
                   project_item_id = None
-                  project_items = data_issue['data']['repository']['issue']['projectItems']['nodes']
+                  project_items = data['data']['repository']['issue']['projectItems']['nodes']
                   for item in project_items:
                       if item and item.get('project') and item['project'].get('number') == project_number:
                           project_item_id = item['id']
@@ -217,31 +231,6 @@ jobs:
                       print("Error: Issue is not associated with the specified project.")
                       issue.create_comment("🤖 **AI Story Point Suggestion:**\n\nI was unable to update the Story Points. This issue is not in the specified project.")
                       sys.exit(1)
-
-                  # --- Obtener IDs del proyecto y del campo de Story Points ---
-                  print("Getting GitHub project and field IDs...")
-                  query_project = """
-                  query($owner: String!, $project_number: Int!) {
-                    user(login: $owner) {
-                      projectV2(number: $project_number) {
-                        id
-                        field(name: "Story Points") {
-                          ... on ProjectV2Field {
-                            id
-                          }
-                        }
-                      }
-                    }
-                  }
-                  """
-                  variables_project = {
-                      "owner": github_user,
-                      "project_number": project_number
-                  }
-                  
-                  data_project = run_graphql_query(query_project, variables_project)
-                  project_id = data_project['data']['user']['projectV2']['id']
-                  story_points_field_id = data_project['data']['user']['projectV2']['field']['id']
 
                   # --- Mutación para actualizar el campo "Story Points" ---
                   print("Updating Story Points field...")
