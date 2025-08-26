@@ -7,6 +7,10 @@ on:
 jobs:
   estimate_story_points:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+      projects: write
 
     steps:
       - name: Checkout Code
@@ -181,9 +185,9 @@ jobs:
                   # --- Obtener IDs necesarios (GitHub GraphQL API) ---
                   print("Getting GitHub project and issue IDs...")
                   query = """
-                  query($owner: String!, $repo: String!, $issue_number: Int!, $project_number: Int!) {
-                    repository(owner: $owner, name: $repo) {
-                      issue(number: $issue_number) {
+                  query {
+                    repository(owner: "%s", name: "%s") {
+                      issue(number: %d) {
                         id
                         projectItems(first: 10) {
                           nodes {
@@ -194,9 +198,9 @@ jobs:
                           }
                         }
                       }
-                      projectV2(number: $project_number) {
+                      projectV2(number: %d) {
                         id
-                        field(name: "Story Points") {
+                        field(name: "%s") {
                           ... on ProjectV2Field {
                             id
                           }
@@ -204,15 +208,9 @@ jobs:
                       }
                     }
                   }
-                  """
-                  variables = {
-                      "owner": github_user,
-                      "repo": github_repo,
-                      "issue_number": issue_number,
-                      "project_number": project_number
-                  }
-                  
-                  data = run_graphql_query(query, variables)
+                  """ % (github_user, github_repo, issue_number, project_number, project_field_name)
+
+                  data = run_graphql_query(query)
                   
                   issue_id = data['data']['repository']['issue']['id']
                   project_id = data['data']['repository']['projectV2']['id']
