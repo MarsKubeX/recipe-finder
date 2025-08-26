@@ -30,7 +30,7 @@ jobs:
           STORY_POINTS: "1, 2, 3, 5, 10, 20"
           PROJECT_NUMBER: 1
           PROJECT_FIELD: "Story Points"
-          GITHUB_USER: "MarsKubeX"  # Using your user name from the URL
+          GITHUB_USER: "MarsKubeX"
           GITHUB_REPO: "recipe-finder"
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           PROJECT_ARCHITECTURE_SUMMARY: |
@@ -77,7 +77,6 @@ jobs:
               if 'errors' in data:
                   print("GraphQL query failed with errors:")
                   print(json.dumps(data['errors'], indent=2))
-                  # Lanza un error para detener el workflow
                   raise Exception("GraphQL query failed.")
               
               return data
@@ -179,26 +178,12 @@ jobs:
 
               if predicted_sp is not None:
                   
-                  # --- Obtener IDs necesarios (GitHub GraphQL API) ---
-                  print("Getting GitHub project and issue IDs...")
-                  # --- CORRECCIÓN CLAVE AQUÍ: Se busca el proyecto a nivel de usuario ---
-                  query = """
-                  query {
-                    user(login: "%s") {
-                      projectV2(number: %d) {
-                        id
-                        fields(first: 20) {
-                          nodes {
-                            ... on ProjectV2Field {
-                              id
-                              name
-                            }
-                          }
-                        }
-                      }
-                    }
-                    repository(owner: "%s", name: "%s") {
-                      issue(number: %d) {
+                  # --- Obtener IDs de la issue y de la tarjeta de proyecto ---
+                  print("Getting GitHub issue and project item IDs...")
+                  query_issue = """
+                  query($owner: String!, $repo: String!, $issue_number: Int!) {
+                    repository(owner: $owner, name: $repo) {
+                      issue(number: $issue_number) {
                         id
                         projectItems(first: 10) {
                           nodes {
@@ -211,27 +196,18 @@ jobs:
                       }
                     }
                   }
-                  """ % (github_user, project_number, github_user, github_repo, issue_number)
-
-                  data = run_graphql_query(query)
+                  """
+                  variables_issue = {
+                      "owner": github_user,
+                      "repo": github_repo,
+                      "issue_number": issue_number
+                  }
                   
-                  issue_id = data['data']['repository']['issue']['id']
-                  project_id = data['data']['user']['projectV2']['id']
-
-                  story_points_field_id = None
-                  project_fields = data['data']['user']['projectV2']['fields']['nodes']
-                  for field in project_fields:
-                      if field['name'] == project_field_name:
-                          story_points_field_id = field['id']
-                          break
-                  
-                  if not story_points_field_id:
-                      print(f"Error: Could not find '{project_field_name}' field in the project.")
-                      issue.create_comment(f"🤖 **AI Story Point Suggestion:**\n\nI was unable to update the Story Points. The field '{project_field_name}' was not found.")
-                      sys.exit(1)
+                  data_issue = run_graphql_query(query_issue, variables_issue)
+                  issue_id = data_issue['data']['repository']['issue']['id']
 
                   project_item_id = None
-                  project_items = data['data']['repository']['issue']['projectItems']['nodes']
+                  project_items = data_issue['data']['repository']['issue']['projectItems']['nodes']
                   for item in project_items:
                       if item and item.get('project') and item['project'].get('number') == project_number:
                           project_item_id = item['id']
@@ -241,6 +217,31 @@ jobs:
                       print("Error: Issue is not associated with the specified project.")
                       issue.create_comment("🤖 **AI Story Point Suggestion:**\n\nI was unable to update the Story Points. This issue is not in the specified project.")
                       sys.exit(1)
+
+                  # --- Obtener IDs del proyecto y del campo de Story Points ---
+                  print("Getting GitHub project and field IDs...")
+                  query_project = """
+                  query($owner: String!, $project_number: Int!) {
+                    user(login: $owner) {
+                      projectV2(number: $project_number) {
+                        id
+                        field(name: "Story Points") {
+                          ... on ProjectV2Field {
+                            id
+                          }
+                        }
+                      }
+                    }
+                  }
+                  """
+                  variables_project = {
+                      "owner": github_user,
+                      "project_number": project_number
+                  }
+                  
+                  data_project = run_graphql_query(query_project, variables_project)
+                  project_id = data_project['data']['user']['projectV2']['id']
+                  story_points_field_id = data_project['data']['user']['projectV2']['field']['id']
 
                   # --- Mutación para actualizar el campo "Story Points" ---
                   print("Updating Story Points field...")
