@@ -28,9 +28,14 @@ jobs:
         env:
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
-          AISTUDIO_API_KEY: ${{ secrets.AISTUDIO_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STORY_POINTS: "1, 2, 3, 5, 10, 20"
+          PROJECT_NUMBER: 1  # Reemplaza con el número de tu proyecto
+          PROJECT_FIELD: "Story Points"
+          GITHUB_USER: "MarsKubeX"  # Reemplaza con tu nombre de usuario o el de la organización
+          GITHUB_REPO: "recipe-finder" # Reemplaza con el nombre de tu repositorio
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
           PROJECT_ARCHITECTURE_SUMMARY: |
             ### Podman Desktop Architecture Summary
 
@@ -64,19 +69,24 @@ jobs:
           import requests
           from github import Github
 
+          def run_query(query, variables=None):
+              headers = {"Authorization": f"Bearer {github_token}"}
+              request = requests.post('https://api.github.com/graphql', json={'query': query, 'variables': variables}, headers=headers)
+              request.raise_for_status()
+              return request.json()
+
           # Get environment variables
           issue_title = os.environ.get('ISSUE_TITLE')
           issue_body = os.environ.get('ISSUE_BODY')
-          gemini_api_key = os.environ.get('AISTUDIO_API_KEY')
+          gemini_api_key = os.environ.get('GEMINI_API_KEY')
           github_token = os.environ.get('GITHUB_TOKEN')
           story_points_str = os.environ.get('STORY_POINTS')
+          project_number = int(os.environ.get('PROJECT_NUMBER'))
+          project_field_name = os.environ.get('PROJECT_FIELD')
+          github_user = os.environ.get('GITHUB_USER')
+          github_repo = os.environ.get('GITHUB_REPO')
+          issue_number = int(os.environ.get('ISSUE_NUMBER'))
           project_architecture = os.environ.get('PROJECT_ARCHITECTURE_SUMMARY')
-
-          # Initialize GitHub API
-          g = Github(github_token)
-          repo = g.get_repo(os.environ.get('GITHUB_REPOSITORY'))
-          issue_number = ${{ github.event.issue.number }}
-          issue = repo.get_issue(number=issue_number)
 
           # Prepare the prompt for Gemini
           prompt = f'''
@@ -150,7 +160,7 @@ jobs:
               result = response.json()
               print(f'Gemini API response: {json.dumps(result, indent=2)}')
 
-              # Parse Gemini's response
+              # --- Extraer la estimación y el análisis ---
               predicted_sp = None
               analysis_text = "I was unable to provide a valid story point estimation for this issue."
               try:
@@ -161,11 +171,97 @@ jobs:
               except (KeyError, IndexError, json.JSONDecodeError) as e:
                   print(f'Error parsing Gemini response: {e}')
 
-              # Add a comment to the issue with the estimation
+              # --- Si la estimación es válida, actualizar el campo de GitHub Project ---
               if predicted_sp is not None:
+                  
+                  # 1. Obtener los IDs necesarios (Issue, Project, Field)
+                  query = """
+                  query($owner: String!, $repo: String!, $issue_number: Int!, $project_number: Int!) {
+                    repository(owner: $owner, name: $repo) {
+                      issue(number: $issue_number) {
+                        id
+                        projectItems(first: 10) {
+                          nodes {
+                            id
+                            project {
+                              number
+                            }
+                          }
+                        }
+                      }
+                      projectV2(number: $project_number) {
+                        id
+                        field(name: "Story Points") {
+                          ... on ProjectV2Field {
+                            id
+                          }
+                        }
+                      }
+                    }
+                  }
+                  """
+                  variables = {
+                      "owner": github_user,
+                      "repo": github_repo,
+                      "issue_number": issue_number,
+                      "project_number": project_number
+                  }
+                  data = run_query(query, variables)
+                  
+                  issue_id = data['data']['repository']['issue']['id']
+                  project_id = data['data']['repository']['projectV2']['id']
+                  story_points_field_id = data['data']['repository']['projectV2']['field']['id']
+
+                  # Encontrar el Project Item ID para la issue
+                  project_item_id = None
+                  project_items = data['data']['repository']['issue']['projectItems']['nodes']
+                  for item in project_items:
+                      if item['project']['number'] == project_number:
+                          project_item_id = item['id']
+                          break
+                  
+                  if not project_item_id:
+                      print("Error: Issue is not associated with the specified project.")
+                      issue.create_comment("🤖 **AI Story Point Suggestion:**\n\nI was unable to update the Story Points. This issue is not in the specified project.")
+                      return
+
+                  # 2. Mutación para actualizar el campo "Story Points"
+                  mutation = """
+                  mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $value: Float!) {
+                    updateProjectV2ItemFieldValue(
+                      input: {
+                        projectId: $project_id,
+                        itemId: $item_id,
+                        fieldId: $field_id,
+                        value: {
+                          number: $value
+                        }
+                      }
+                    ) {
+                      item {
+                        id
+                      }
+                    }
+                  }
+                  """
+                  variables = {
+                      "project_id": project_id,
+                      "item_id": project_item_id,
+                      "field_id": story_points_field_id,
+                      "value": predicted_sp
+                  }
+                  update_data = run_query(mutation, variables)
+                  
+                  print(f'Successfully updated Story Points for issue #{issue_number} to {predicted_sp}.')
+                  
+                  # 3. Añadir un comentario con el análisis
+                  g = Github(github_token)
+                  repo = g.get_repo(os.environ.get('GITHUB_REPOSITORY'))
+                  issue = repo.get_issue(number=issue_number)
+                  
                   comment_body = f"🤖 **AI Story Point Suggestion:**\n\n- **Estimated Effort:** **{predicted_sp} Story Points**\n\n---\n\n### AI Analysis\n\n{analysis_text}"
                   issue.create_comment(comment_body)
-                  print(f'Successfully commented on issue #{issue_number} with {predicted_sp} Story Points.')
+                  print(f'Successfully commented on issue #{issue_number} with the analysis.')
               else:
                   comment_body = "🤖 **AI Story Point Suggestion:**\n\nI was unable to provide a valid story point estimation for this issue. This might be due to a lack of clear description or an error in the AI service. Please, assign story points manually."
                   issue.create_comment(comment_body)
