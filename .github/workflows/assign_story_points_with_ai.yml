@@ -7,10 +7,6 @@ on:
 jobs:
   estimate_story_points:
     runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      contents: read
-      projects: write
 
     steps:
       - name: Checkout Code
