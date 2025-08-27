@@ -62,7 +62,7 @@ jobs:
               }
             }
           GRAPHQL_MUTATION_IDS: |
-            mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $value: Float!) {
+           mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $value: Float!) {
               updateProjectV2ItemFieldValue(
                 input: {
                   projectId: $project_id,
@@ -73,9 +73,7 @@ jobs:
                   }
                 }
               ) {
-                item {
-                  id
-                }
+                clientMutationId
               }
             }
           PROJECT_ARCHITECTURE_SUMMARY: |
