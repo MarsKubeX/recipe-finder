@@ -269,7 +269,6 @@ jobs:
                   
                   print(f'Successfully updated Story Points for issue #{issue_number} to {predicted_sp}.')
                   
-                  print(f'Successfully commented on issue #{issue_number} with the analysis.')
               else:
                   print('Could not get a valid estimation from the AI.')
 
