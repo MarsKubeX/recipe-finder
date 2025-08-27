@@ -33,6 +33,32 @@ jobs:
           GITHUB_USER: "MarsKubeX"
           GITHUB_REPO: "recipe-finder"
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GRAPHQL_QUERY: |
+            query($owner: String!, $project_number: Int!, $repo: String!, $issue_number: Int!) {
+              user(login: $owner) {
+                projectV2(number: $project_number) {
+                  id
+                  field(name: "Story Points") {
+                    ... on ProjectV2Field {
+                      id
+                    }
+                  }
+                }
+              }
+              repository(owner: $owner, name: $repo) {
+                issue(number: $issue_number) {
+                  id
+                  projectItems(first: 10) {
+                    nodes {
+                      id
+                      project {
+                        number
+                      }
+                    }
+                  }
+                }
+              }
+            }
           PROJECT_ARCHITECTURE_SUMMARY: |
             ### Podman Desktop Architecture Summary
 
@@ -180,33 +206,7 @@ jobs:
                   
                   # --- Obtener IDs necesarios (GitHub GraphQL API) ---
                   print("Getting GitHub project and issue IDs...")
-                  query = """
-                  query(\$owner: String!, \$repo: String!, \$issue_number: Int!, \$project_id: ID!) {
-                    node(id: \$project_id) {
-                      ... on ProjectV2 {
-                        id
-                        field(name: "Story Points") {
-                          ... on ProjectV2Field {
-                            id
-                          }
-                        }
-                      }
-                    }
-                    repository(owner: \$owner, name: \$repo) {
-                      issue(number: \$issue_number) {
-                        id
-                        projectItems(first: 10) {
-                          nodes {
-                            id
-                            project {
-                              number
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                  """
+                  query = os.environ.get('GRAPHQL_QUERY')
                   print("Query to be sent:\n", query)
                   variables = {
                       "owner": github_user,
