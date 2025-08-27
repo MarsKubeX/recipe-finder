@@ -269,17 +269,8 @@ jobs:
                   
                   print(f'Successfully updated Story Points for issue #{issue_number} to {predicted_sp}.')
                   
-                  # --- Añadir un comentario con el análisis ---
-                  g = Github(github_token)
-                  repo = g.get_repo(os.environ.get('GITHUB_REPOSITORY'))
-                  issue = repo.get_issue(number=issue_number)
-                  
-                  comment_body = f"🤖 **AI Story Point Suggestion:**\n\n- **Estimated Effort:** **{predicted_sp} Story Points**\n\n---\n\n### AI Analysis\n\n{analysis_text}"
-                  issue.create_comment(comment_body)
                   print(f'Successfully commented on issue #{issue_number} with the analysis.')
               else:
-                  comment_body = "🤖 **AI Story Point Suggestion:**\n\nI was unable to provide a valid story point estimation for this issue. This might be due to a lack of clear description or an error in the AI service. Please, assign story points manually."
-                  issue.create_comment(comment_body)
                   print('Could not get a valid estimation from the AI.')
 
           except requests.exceptions.HTTPError as err:
