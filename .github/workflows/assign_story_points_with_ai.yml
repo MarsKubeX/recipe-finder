@@ -60,6 +60,23 @@ jobs:
                 }
               }
             }
+          GRAPHQL_MUTATION_IDS: |
+            mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $value: Float!) {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: $project_id,
+                  itemId: $item_id,
+                  fieldId: $field_id,
+                  value: {
+                    number: $value
+                  }
+                }
+              ) {
+                item {
+                  id
+                }
+              }
+            }
           PROJECT_ARCHITECTURE_SUMMARY: |
             ### Podman Desktop Architecture Summary
 
@@ -120,6 +137,10 @@ jobs:
           github_repo = os.environ.get('GITHUB_REPO')
           issue_number = int(os.environ.get('ISSUE_NUMBER'))
           project_architecture = os.environ.get('PROJECT_ARCHITECTURE_SUMMARY')
+          project_id = os.environ.get('PROJECT_ID')
+
+          graphql_query = os.environ.get('GRAPHQL_QUERY_IDS')
+          graphql_mutation = os.environ.get('GRAPHQL_MUTATION_IDS')
 
           # --- Prepare the prompt for Gemini ---
           prompt = f'''
@@ -207,20 +228,20 @@ jobs:
                   
                   # --- Obtener IDs necesarios (GitHub GraphQL API) ---
                   print("Getting GitHub project and issue IDs...")
-                  query = os.environ.get('GRAPHQL_QUERY')
+                  query = graphql_query
                   print("Query to be sent:\n", query)
                   variables = {
+                      "project_id": project_id,
                       "owner": github_user,
                       "repo": github_repo,
                       "issue_number": issue_number,
-                      "project_number": project_number
                   }
                   
                   data = run_graphql_query(query, variables)
                   
+                  project_id = data['data']['node']['id']
+                  story_points_field_id = data['data']['node']['field']['id']
                   issue_id = data['data']['repository']['issue']['id']
-                  project_id = data['data']['user']['projectV2']['id']
-                  story_points_field_id = data['data']['user']['projectV2']['field']['id']
 
                   project_item_id = None
                   project_items = data['data']['repository']['issue']['projectItems']['nodes']
@@ -236,24 +257,7 @@ jobs:
 
                   # --- Mutación para actualizar el campo "Story Points" ---
                   print("Updating Story Points field...")
-                  mutation = """
-                  mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $value: Float!) {
-                    updateProjectV2ItemFieldValue(
-                      input: {
-                        projectId: $project_id,
-                        itemId: $item_id,
-                        fieldId: $field_id,
-                        value: {
-                          number: $value
-                        }
-                      }
-                    ) {
-                      item {
-                        id
-                      }
-                    }
-                  }
-                  """
+                  mutation = graphql_mutation
                   variables = {
                       "project_id": project_id,
                       "item_id": project_item_id,
