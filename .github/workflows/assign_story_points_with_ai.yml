@@ -255,7 +255,7 @@ jobs:
                       issue.create_comment("🤖 **AI Story Point Suggestion:**\n\nI was unable to update the Story Points. This issue is not in the specified project.")
                       sys.exit(1)
 
-                  # --- Mutación para actualizar el campo "Story Points" ---
+                  # --- "Story Points" field update ---
                   print("Updating Story Points field...")
                   mutation = graphql_mutation
                   variables = {
